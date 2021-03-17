@@ -1,0 +1,99 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+// Interpolate U to create near-wall UNear
+near
+{
+    // Where to load it from
+    libs            (fieldFunctionObjects);
+
+    type nearWallFields;
+
+    // Output every
+    writeControl    writeTime;
+
+    // Calculate every
+    executeControl  writeTime;
+
+    // Fields to be sampled. Per field original name and mapped field to
+    // create.
+    // Note: fields only get updated when writing!
+    fields
+    (
+        (U UNear)
+    );
+
+    // Patches/groups to sample (regular expressions)
+    patches         (motorBikeGroup);
+
+    // Distance to sample
+    distance        0.001;
+}
+
+
+// Use UNear to track along wall
+wallBoundedStreamLines
+{
+    // Mandatory entries
+    type            wallBoundedStreamLine;
+    libs            (fieldFunctionObjects);
+    U               UNear;           // Velocity field to use for tracking.
+    fields          (p U k UNear);   // Names of fields to sample.
+    setFormat       vtk;    //gnuplot; //xmgr; //raw; //jplot;
+    direction       forward;
+    lifeTime        100;    // Steps particles can travel before being removed
+    cloud           wallBoundedParticleTracks;
+    seedSampleSet
+    {
+        type        patchSeed;
+
+        uniformCoeffs
+        {
+            axis        x;  //distance;
+            start       (0.0035 0.0999 0.0001);
+            end         (0.0035 0.0999 0.0099);
+            nPoints     20;
+        }
+
+        cloudCoeffs
+        {
+            axis        x;  //distance;
+            points      ((0.351516548679288 -0.0116085375585099 1.24));
+        }
+
+        patchSeedCoeffs
+        {
+            patches     (motorBikeGroup);
+            axis        x;  //distance;
+            maxPoints   20000;
+        }
+    }
+
+    // Optional entries
+    // bounds          (0.2 -10 -10)(0.22 10 10);
+    // trackLength     1e-3;
+    // nSubCycle       1;
+    interpolationScheme cellPoint;
+
+    // Deprecated
+    // trackForward    true;
+
+    // Optional (inherited) entries
+    region          region0;
+    enabled         true;
+    log             true;
+    timeStart       0;
+    timeEnd         1000;
+    executeControl  timeStep;
+    executeInterval 1;
+    writeControl    writeTime;
+    writeInterval   -1;
+}
+
+
+// ************************************************************************* //
