@@ -1,27 +1,40 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v2012                                 |
+|  \\    /   O peration     | Version:  2012                                  |
 |   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 FoamFile
 {
-    version     2.0;
-    format      ascii;
-    class       dictionary;
-    object      decomposeParDict;
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          dynamicMeshDict;
 }
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains 6;
+dynamicFvMesh   dynamicRefineFvMesh;
 
-method          hierarchical;
-// method          ptscotch;
+refineInterval  1;
 
-coeffs
-{
-    n           (3 2 1);
-}
+field           magVorticity;
+
+lowerRefineLevel 80;
+
+upperRefineLevel 200;
+
+unrefineLevel   0;
+
+nBufferLayers   2;
+
+maxRefinement   7;
+
+maxCells        1000000;
+
+correctFluxes   ( ( phi none ) );
+
+dumpLevel       true;
+
 
 // ************************************************************************* //

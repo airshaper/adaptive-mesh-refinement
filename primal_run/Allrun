@@ -1,0 +1,133 @@
+#!/bin/bash
+cd "${0%/*}" || exit                                # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions        # Tutorial run functions
+#------------------------------------------------------------------------------
+
+refinement='-case ../primal_refinement'
+
+declare -a polyMeshFields=("boundary" "cellLevel" "cellZones" "faces" "faceZones" "level0Edge" "neighbour" "owner" "pointLevel" "points" "pointZones")
+
+prepareCastellatedMesh()
+{
+    local dict=system/snappyHexMeshDict
+    local path=castellatedMeshControls.refinementSurfaces.motorBike
+    foamDictionary $dict -entry snap -set false
+    foamDictionary $dict -entry $path.faceType -add baffle
+    foamDictionary $dict -entry $path.faceZone -add motorBike_zone
+    foamDictionary $dict -entry $path.patchInfo -remove
+}
+
+prepareForSnapping()
+{
+    local dict=system/snappyHexMeshDict
+    local path=castellatedMeshControls.refinementSurfaces.motorBike
+    foamDictionary $dict -entry $path.faceType -remove
+    foamDictionary $dict -entry $path.faceZone -remove
+    foamDictionary $dict -entry snap -set true
+    foamDictionary $dict -entry $path.patchInfo -add "{type wall; inGroups (motorBikeGroup);}"
+}
+
+# Alternative decomposeParDict name:
+decompDict="-decomposeParDict system/decomposeParDict.6"
+## Standard decomposeParDict name:
+unset decompDict
+
+# copy motorbike surface from resources directory
+\cp ./geometry/motorBike.obj.gz constant/triSurface/
+runApplication surfaceFeatureExtract
+
+runApplication blockMesh
+
+runApplication $decompDict decomposePar
+
+# we need non-snapped mesh for pimpleFoam refinement loop
+prepareCastellatedMesh
+runParallel $decompDict -s "castellated" snappyHexMesh -overwrite
+runParallel $decompDict -s "castellated" checkMesh -writeFields '(nonOrthoAngle)' -constant
+
+ls -d processor* | xargs -I {} rm -f {}/constant/polyMesh/faceZones
+
+# copy mesh for the refinement
+cp -R processor* ../primal_refinement
+# copy blockMesh
+cp -R constant/polyMesh ../primal_refinement/constant/polyMesh
+
+prepareForSnapping
+runParallel $decompDict -s "snapped" snappyHexMesh -overwrite
+runParallel $decompDict -s "snapped" checkMesh -writeFields '(nonOrthoAngle)' -constant
+
+runParallel $decompDict topoSet
+
+#- For parallel running: set the initial fields
+restore0Dir -processor
+
+runParallel $decompDict -s "beforeRefinement" potentialFoam -writephi
+runParallel $decompDict -s "beforeRefinement" checkMesh -writeFields '(nonOrthoAngle)' -constant
+
+runParallel $decompDict $(getApplication)
+
+ls -d processor* | xargs -I {} \
+    cp -R ./0.orig ../primal_refinement
+
+cd ../primal_refinement
+
+ls -d processor* | xargs -I {} \
+    foamDictionary {}/0/include/initialConditions \
+    -entry flowVelocity -set "(0 0 0)"
+
+# Refine over curl(U) in 3 passes and grad(p) in one pass
+for index in 1 2 3 4
+do
+    foamDictionary system/controlDict -entry endTime -set $index
+    runParallel $decompDict -s "$index" mapFieldsPar -sourceTime 'latestTime' \
+        -fields '(p U k magVorticity magGradp)' ../primal_run
+    if [ $index -eq 4 ]
+    then
+        foamDictionary constant/dynamicMeshDict -entry field -set magGradp
+    fi
+    runParallel -s "$index" $decompDict pimpleFoam
+
+    for field in "${polyMeshFields[@]}"
+    do
+        ls -d processor* | xargs -I {} \
+            cp -rf ./{}/$index/polyMesh/$field \
+            ./{}/constant/polyMesh/
+        ls -d processor* | xargs -I {} \
+            sed -i "s/$index\/polyMesh/constant\/polyMesh/g" \
+            ./{}/constant/polyMesh/$field
+    done
+
+    ls -d processor* | xargs -I {} \
+        cp -rf ./0.orig/* ./{}/$index/
+
+    ls -d processor* | xargs -I {} \
+        foamDictionary {}/$index/include/initialConditions \
+        -entry flowVelocity -set "(0 0 0)"
+
+    # remove refinementHistory
+    ls -d processor* | xargs -I {} \
+        rm -Rf ./{}/$index/polyMesh/refinementHistory
+done
+
+# reset primal refinement fields
+foamDictionary system/controlDict -entry endTime -set 0
+foamDictionary constant/dynamicMeshDict -entry field -set magVorticity
+
+
+cd ../primal_run
+
+rm -Rf processor*
+
+
+
+runParallel $decompDict -a snappyHexMesh -overwrite
+
+runParallel $decompDict potentialFoam -writephi
+runParallel $decompDict -a checkMesh -writeFields '(nonOrthoAngle)' -constant
+
+runParallel $decompDict $(getApplication)
+
+touch foam.foam
+
+
+#------------------------------------------------------------------------------
