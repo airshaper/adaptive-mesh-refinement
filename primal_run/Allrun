@@ -130,7 +130,7 @@ done
 
 runParallel $decompDict -s "AfterRefinement" snappyHexMesh -overwrite
 
-runParallel $decompDict topoSet
+runParallel $decompDict -s "AfterRefinement" topoSet
 
 restore0Dir -processor
 
