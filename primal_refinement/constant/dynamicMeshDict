@@ -18,11 +18,13 @@ dynamicFvMesh   dynamicRefineFvMesh;
 
 refineInterval  1;
 
-field           magVorticity;
+field           refVal;
 
-lowerRefineLevel 80;
+// adjust the value below (lowerRefineLevel)
+// depending on which refinement strategy is used
+lowerRefineLevel 1; // or 10 if gradp is used as refinement strategy
 
-upperRefineLevel 200;
+upperRefineLevel 100000000;
 
 unrefineLevel   0;
 
@@ -30,7 +32,7 @@ nBufferLayers   2;
 
 maxRefinement   7;
 
-maxCells        1000000;
+maxCells        10000000;
 
 correctFluxes   ( ( phi none ) );
 

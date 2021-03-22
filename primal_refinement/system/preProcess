@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    system;
+    object      preProcess;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+functions
+{
+    createRefVal
+    {
+        name    createRefVal;
+        type    coded;
+        libs    (utilityFunctionObjects);
+        enabled yes;
+
+        codeEnd
+        #{
+            Info<< "Creating refVal field\n" << endl;
+            volScalarField refVal
+            (
+                IOobject
+                (
+                    "refVal",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("refVal", dimensionSet(0, 2, -2, 0, 0, 0, 0), Zero)
+            );
+
+            const scalarField& v = mesh().V();
+
+            // refinement based on normalized pressure gradient
+            //const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+            //const volScalarField& magGradp = mag(fvc::grad(p));
+
+            // refinement based on normalized velocity curl
+            const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+            const volScalarField& magCurlU = mag(fvc::curl(U));
+
+
+            forAll(refVal, celli)
+            {
+                //refVal[celli] = pow(v[celli], 1.0/3.0) * magGradp[celli];
+                refVal[celli] = pow(v[celli], 1.0/3.0) * magCurlU[celli];
+            }
+            refVal.correctBoundaryConditions();
+            refVal.write();
+            
+        #};
+    }
+}
+
+
+// ************************************************************************* //

@@ -40,14 +40,14 @@ runApplication blockMesh
 
 runApplication $decompDict decomposePar
 
-# we need non-snapped mesh for pimpleFoam refinement loop
+# we need non-snapped mesh for pimpleFoam refinement
 prepareCastellatedMesh
 runParallel $decompDict -s "castellated" snappyHexMesh -overwrite
 runParallel $decompDict -s "castellated" checkMesh -writeFields '(nonOrthoAngle)' -constant
 
 ls -d processor* | xargs -I {} rm -f {}/constant/polyMesh/faceZones
 
-# copy mesh for the refinement
+# copy non-snapped mesh for the refinement
 cp -R processor* ../primal_refinement
 # copy blockMesh
 cp -R constant/polyMesh ../primal_refinement/constant/polyMesh
@@ -71,61 +71,74 @@ ls -d processor* | xargs -I {} \
 
 cd ../primal_refinement
 
+# Refine over curl(U) in 3 passes and grad(p) in one pass
+
+ls -d processor* | xargs -I {} \
+            rm -Rf ./{}/0
+
+ls -d processor* | xargs -I {} \
+            cp -R ./0.orig ./{}/0
+
 ls -d processor* | xargs -I {} \
     foamDictionary {}/0/include/initialConditions \
     -entry flowVelocity -set "(0 0 0)"
 
-# Refine over curl(U) in 3 passes and grad(p) in one pass
-for index in 1 2 3 4
+runParallel $decompDict -s "refinement" mapFieldsPar -sourceTime 'latestTime' \
+    -fields '(p U k nut omega)' ../primal_run
+
+runParallel -s "refVal" $decompDict pimpleFoam -postProcess \
+    -dict system/preProcess -latestTime
+
+runParallel $decompDict pimpleFoam
+
+for file in "${polyMeshFields[@]}"
 do
-    foamDictionary system/controlDict -entry endTime -set $index
-    runParallel $decompDict -s "$index" mapFieldsPar -sourceTime 'latestTime' \
-        -fields '(p U k magVorticity magGradp)' ../primal_run
-    if [ $index -eq 4 ]
-    then
-        foamDictionary constant/dynamicMeshDict -entry field -set magGradp
-    fi
-    runParallel -s "$index" $decompDict pimpleFoam
-
-    for field in "${polyMeshFields[@]}"
-    do
-        ls -d processor* | xargs -I {} \
-            cp -rf ./{}/$index/polyMesh/$field \
-            ./{}/constant/polyMesh/
-        ls -d processor* | xargs -I {} \
-            sed -i "s/$index\/polyMesh/constant\/polyMesh/g" \
-            ./{}/constant/polyMesh/$field
-    done
-
     ls -d processor* | xargs -I {} \
-        cp -rf ./0.orig/* ./{}/$index/
-
+        cp -rf ./{}/1/polyMesh/$file \
+        ./{}/constant/polyMesh/
     ls -d processor* | xargs -I {} \
-        foamDictionary {}/$index/include/initialConditions \
-        -entry flowVelocity -set "(0 0 0)"
-
-    # remove refinementHistory
-    ls -d processor* | xargs -I {} \
-        rm -Rf ./{}/$index/polyMesh/refinementHistory
+        sed -i "s/1\/polyMesh/constant\/polyMesh/g" \
+        ./{}/constant/polyMesh/$file
 done
 
-# reset primal refinement fields
-foamDictionary system/controlDict -entry endTime -set 0
-foamDictionary constant/dynamicMeshDict -entry field -set magVorticity
+# remove refinementHistory
+ls -d processor* | xargs -I {} \
+    rm -Rf ./{}/0/polyMesh/refinementHistory
 
+# remove data from initial run
+rm -Rf ../primal_run/processor*
+
+# create processorN/constant/polyMesh directories
+ls -d processor* | xargs -I {} \
+    mkdir -p ../primal_run/{}/constant/polyMesh
+
+# copy refined mesh to primal_run
+ls -d processor* | xargs -I {} \
+                cp -R ./{}/constant/polyMesh \
+                ../primal_run/{}/constant
 
 cd ../primal_run
 
-rm -Rf processor*
+for file in "${polyMeshFields[@]}"
+do
+ls -d processor* | xargs -I {} \
+    sed -i "s/0\/polyMesh/constant\/polyMesh/g" \
+    ./{}/constant/polyMesh/$file
+done
 
+runParallel $decompDict -s "AfterRefinement" snappyHexMesh -overwrite
 
+runParallel $decompDict topoSet
 
-runParallel $decompDict -a snappyHexMesh -overwrite
+restore0Dir -processor
 
-runParallel $decompDict potentialFoam -writephi
-runParallel $decompDict -a checkMesh -writeFields '(nonOrthoAngle)' -constant
+runParallel $decompDict -s "AfterRefinement" potentialFoam -writephi
+runParallel $decompDict -s "AfterRefinement" checkMesh -writeFields '(nonOrthoAngle)' -constant
 
-runParallel $decompDict $(getApplication)
+runParallel $decompDict -s "AfterRefinement" $(getApplication)
+
+runApplication reconstructParMesh -constant
+runApplication reconstructPar -latestTime
 
 touch foam.foam
 

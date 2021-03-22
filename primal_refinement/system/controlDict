@@ -16,8 +16,11 @@ FoamFile
 }
 
 application     pimpleFoam;
+
 startFrom       latestTime;
+
 startTime       0;
+
 endTime         1;
 
 deltaT          1;
@@ -50,7 +53,7 @@ functions
     {
         type            readFields;
         libs            ( fieldFunctionObjects );
-        fields          ( magVorticity magGradp );
+        fields          ( refVal );
         readOnStart     true;
     }
 }
