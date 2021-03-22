@@ -92,6 +92,7 @@ runParallel -s "refVal" $decompDict pimpleFoam -postProcess \
 
 runParallel $decompDict pimpleFoam
 
+# copy refined mesh to constant/polyMesh
 for file in "${polyMeshFields[@]}"
 do
     ls -d processor* | xargs -I {} \
