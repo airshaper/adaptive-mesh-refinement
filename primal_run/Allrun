@@ -71,7 +71,7 @@ ls -d processor* | xargs -I {} \
 
 cd ../primal_refinement
 
-# Refine over curl(U) in 3 passes and grad(p) in one pass
+# Refine over curl(U) or grad(p) in one pass
 
 ls -d processor* | xargs -I {} \
             rm -Rf ./{}/0
@@ -86,6 +86,7 @@ ls -d processor* | xargs -I {} \
 runParallel $decompDict -s "refinement" mapFieldsPar -sourceTime 'latestTime' \
     -fields '(p U k nut omega)' ../primal_run
 
+# calculate refVal field for refinement
 runParallel -s "refVal" $decompDict pimpleFoam -postProcess \
     -dict system/preProcess -latestTime
 
