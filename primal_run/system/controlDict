@@ -5,7 +5,6 @@
 |   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 FoamFile
 {
     version         2;
@@ -13,6 +12,7 @@ FoamFile
     class           dictionary;
     object          controlDict;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 application     simpleFoam;
 
@@ -46,11 +46,7 @@ runTimeModifiable true;
 
 functions
 {
-    #include "streamLines"
-    #include "wallBoundedStreamLines"
-    #include "cuttingPlane"
     #include "forceCoeffs"
-    #include "ensightWrite"
 }
 
 
