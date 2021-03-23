@@ -71,13 +71,14 @@ ls -d processor* | xargs -I {} \
 
 cd ../primal_refinement
 
+cp ../primal_run/system/decomposeParDict ./system
+
 # Refine over curl(U) or grad(p) in one pass
 
 ls -d processor* | xargs -I {} \
             rm -Rf ./{}/0
 
-ls -d processor* | xargs -I {} \
-            cp -R ./0.orig ./{}/0
+restore0Dir -processor
 
 ls -d processor* | xargs -I {} \
     foamDictionary {}/0/include/initialConditions \
