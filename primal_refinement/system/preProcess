@@ -26,7 +26,7 @@ functions
 
         codeEnd
         #{
-            Info<< "Creating refVal field\n" << endl;
+            Info<< "Started creating refVal field\n" << endl;
             volScalarField refVal
             (
                 IOobject
@@ -51,14 +51,15 @@ functions
             const volVectorField& U = mesh().lookupObject<volVectorField>("U");
             const volScalarField& magCurlU = mag(fvc::curl(U));
 
-
             forAll(refVal, celli)
             {
                 //refVal[celli] = pow(v[celli], 1.0/3.0) * magGradp[celli];
                 refVal[celli] = pow(v[celli], 1.0/3.0) * magCurlU[celli];
             }
-            refVal.correctBoundaryConditions();
+
             refVal.write();
+
+            Info<< "Finished creating refVal field\n" << endl;
             
         #};
     }
