@@ -51,10 +51,6 @@ functions
     #include "cuttingPlane"
     #include "forceCoeffs"
     #include "ensightWrite"
-    #include "gradp"
-    #include "vorticity"
-    #include "magGradp"
-    #include "magVorticity"
 }
 
 
