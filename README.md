@@ -7,7 +7,7 @@ OpenFoam® motorBike case with adaptive mesh refinement based on curl(U) or grad
 1. Make sure you have installed latest [OpenFoam® v2012](https://www.openfoam.com/download/)
 2. Clone this repository on your machine `git clone https://github.com/airshaper/adaptive-mesh-refinement.git`
 3. Adopt `primal_run/system/decomposeParDict` depending on number of cores you have. Change `numberOfSubdomains 6` to number of cores or threads you have available. Also modify `n` under `coeffs` to reflect `numberOfSubdomains` change. For example if you have 12 cores your `n` should be `(3 2 2)` if you have 16 cores for example then `n` should be `(4 2 2)` and so on.
-4. Run `./Allrun`
+4. Go to `cd ./primal_run` then run `./Allrun`
 
 Non-refined mesh slice
 ![Non-refined mesh](images/motorBike_before_refinement_slice.png?raw=true "Non-refined mesh")
