@@ -11,6 +11,7 @@ Any field can be used for refinement. In this tutorial, two options have been in
 
 - grad(p): the pressure gradient
 - curl(U): the curl of the velocity field
+
   Both are multipled by the cell length to "discourage" the algorithm to keep refining the smallest cells.
   The method has 3 major parts:
 
@@ -25,7 +26,7 @@ Any field can be used for refinement. In this tutorial, two options have been in
 
 2. Refinement field
 
-   Once the first CFD loop has finished, it maps the fields onto the stored castellated mesh (in `primal_refinement`) calculates the refinement field (`refVal`), for which the lower limit value should be set manually in `dynamicMeshDict`.
+   Once the first CFD loop has finished, it maps the fields onto the stored castellated mesh (in `primal_refinement`) and calculates the refinement field (`refVal`), for which the lower limit value should be set manually in `dynamicMeshDict`.
 
 3. Mesh refinement
 
@@ -36,7 +37,7 @@ Any field can be used for refinement. In this tutorial, two options have been in
 
 This method allows for mesh refinement of both the volume and the surface mesh.
 
-In contrast to other OpenFOAM based methods that refine on the surface, the mesh is re-snapped after refinement, which improves the correspondence to the real geometry.
+In contrast to other OpenFOAM® based methods that refine on the surface, the mesh is re-snapped after refinement, which improves the correspondence to the real geometry.
 
 Adaptive mesh refinement can greatly reduce the computational cost, as the mesh is applied in a more efficient way.
 
