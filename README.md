@@ -4,7 +4,7 @@
 
 OpenFoam® motorBike case with adaptive volume & surface mesh refinement based on curl(U) or grad(p)
 
-# Description
+## Description
 
 This repository provides adaptive mesh refinement for both the volume mesh and the surface mesh.
 Any field can be used for refinement. In this tutorial, two options have been included:
@@ -20,7 +20,7 @@ Any field can be used for refinement. In this tutorial, two options have been in
 
    - castellated mesh: only runs the refinement phase using "baffles" for the surface of the geometry (to avoid the mesh inside the geometry being cut and to keep all cells hexagonal).
      This mesh is stored in `primal_refinement` for use in the mesh refinement phase.
-   - snapping phase: this part will cut the mesh (by also having castellated enabled) and snap it to the surface (by setting the surface patch type to "wall").
+   - snapping phase: this part will cut the mesh (by also having castellated enabled) and snap it to the surface (by setting the surface patch type to `wall`).
      This mesh is used in `primal_run` for the first CFD loop.
 
 2. Refinement field
@@ -32,7 +32,7 @@ Any field can be used for refinement. In this tutorial, two options have been in
    The refinement is then applied to the castellated mesh of the first loop. Once refinement is done, the castellated mesh is copied to `primal_run` where the snapping phase is executed again to snap the refined mesh to the surface.
    This mesh is then used for the second CFD run.
 
-# Conclusions
+## Conclusions
 
 This method allows for mesh refinement of both the volume and the surface mesh.
 
@@ -45,7 +45,7 @@ The gradient of pressure (useful for airfoils for example) and curl of the veloc
 
 We definitely welcome any contribution to further improve this method (for example, would it be easier to just use refineMesh instead of pimpleFoam?).
 
-# How to run the case
+## How to run the case
 
 1. Make sure you have installed latest [OpenFoam® v2012](https://www.openfoam.com/download/)
 2. Clone this repository on your machine `git clone https://github.com/airshaper/adaptive-mesh-refinement.git`
