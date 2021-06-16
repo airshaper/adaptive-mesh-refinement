@@ -3,10 +3,16 @@ cd "${0%/*}" || exit                                # Run from this directory
 . ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions        # Tutorial run functions
 #------------------------------------------------------------------------------
 
+
+# Set the path to the refinement folder as a variable
 refinement='-case ../primal_refinement'
 
+# Array declaration of the mesh fields that will be copied later on
 declare -a polyMeshFields=("boundary" "cellLevel" "cellZones" "faces" "faceZones" "level0Edge" "neighbour" "owner" "pointLevel" "points" "pointZones")
 
+
+# When called, this method will modify the snappyHexMeshDict file to run the castellated phase.
+# It marks surfaces as baffle so that they get refined without the "inner mesh" being cut out
 prepareCastellatedMesh()
 {
     local dict=system/snappyHexMeshDict
@@ -17,6 +23,8 @@ prepareCastellatedMesh()
     foamDictionary $dict -entry $path.patchInfo -remove
 }
 
+# When called, this method will modify the snappyHexMeshDict file to run the snapping phase.
+# It sets snapping to true and sets the refinement surface patch type to "wall" to create a real patch (including cutting of the inner mesh)
 prepareForSnapping()
 {
     local dict=system/snappyHexMeshDict
@@ -27,73 +35,97 @@ prepareForSnapping()
     foamDictionary $dict -entry $path.patchInfo -add "{type wall; inGroups (motorBikeGroup);}"
 }
 
-# Alternative decomposeParDict name:
-decompDict="-decomposeParDict system/decomposeParDict.6"
-## Standard decomposeParDict name:
-unset decompDict
-
 # copy motorbike surface from resources directory
 \cp ./geometry/motorBike.obj.gz constant/triSurface/
+
+
+# Extract the features of the geometry (for edge refinement in snappyHexMesh)
 runApplication surfaceFeatureExtract
 
+# Run blockMesh to create the base mesh for the wind tunnel
 runApplication blockMesh
 
+# Decompose the case to run on multiple processors
 runApplication $decompDict decomposePar
 
-# we need non-snapped mesh for pimpleFoam refinement
+# In the first step, the castellated mesh is generated (using the object to refine locally).
+# It's important not to cut the mesh so that only hexagonal elements are present.
+# These are required by pimpleFoam to do the refinement later on (pimpleFoam cannot properly refine cut & snapped cells)
+# The snappyHexMesh dictionary is prepared to run only the castellated phase (using the "prepareCastellatedMesh" method declared above)
 prepareCastellatedMesh
 runParallel $decompDict -s "castellated" snappyHexMesh -overwrite
 runParallel $decompDict -s "castellated" checkMesh -writeFields '(nonOrthoAngle)' -constant
 
+
+# Remove face zones
 ls -d processor* | xargs -I {} rm -f {}/constant/polyMesh/faceZones
 
-# copy non-snapped mesh for the refinement
+
+# The castellated mesh (which has not been cut) is copied into a separate folder where the refinement can be applied later on (after the first CFD loop has been run)
 cp -R processor* ../primal_refinement
-# copy blockMesh
 cp -R constant/polyMesh ../primal_refinement/constant/polyMesh
 
+
+# After a copy of the mesh has been made, work continues on the mesh in the primalRun folder.
+# The snappyHexMesh dictionary is prepared to run the snapping phase (using the "prepareForSnapping" method declared above)
 prepareForSnapping
 runParallel $decompDict -s "snapped" snappyHexMesh -overwrite
 runParallel $decompDict -s "snapped" checkMesh -writeFields '(nonOrthoAngle)' -constant
-
 runParallel $decompDict topoSet
 
-#- For parallel running: set the initial fields
+
+#- For parallel running: set the 0 folder
 restore0Dir -processor
 
-runParallel $decompDict -s "beforeRefinement" potentialFoam -writephi
-runParallel $decompDict -s "beforeRefinement" checkMesh -writeFields '(nonOrthoAngle)' -constant
 
+# Initialize the flow field using potentialFoam (makes it easier/faster for simpleFoam to converge)
+runParallel $decompDict -s "beforeRefinement" potentialFoam -writephi
+
+
+# Run simpleFoam (first CFD run)
 runParallel $decompDict $(getApplication)
 
+
+# Copy the boundary conditions in the 0 folder to the refinement folder
 ls -d processor* | xargs -I {} \
     cp -R ./0.orig ../primal_refinement
 
+
+# Set path to the refinement folder
 cd ../primal_refinement
 
+
+# copy the decomposeParDict into the refinement folder
 cp ../primal_run/system/decomposeParDict ./system
 
-# Refine over curl(U) or grad(p) in one pass
 
+
+# Clear the 0 folders inside the processor folders
 ls -d processor* | xargs -I {} \
             rm -Rf ./{}/0
 
+# Restore the 0 folder inside the processor folders
 restore0Dir -processor
 
-ls -d processor* | xargs -I {} \
-    foamDictionary {}/0/include/initialConditions \
-    -entry flowVelocity -set "(0 0 0)"
 
+# Map the field data of the first CFD run (using the snapped mesh in the primal run folder) on the stored castellated mesh (in the primal refinement folder)
 runParallel $decompDict -s "refinement" mapFieldsPar -sourceTime 'latestTime' \
     -fields '(p U k nut omega)' ../primal_run
 
-# calculate refVal field for refinement
+
+# calculate the refVal field for refinement (see system/preProcess file)
+# preProcess will create a new field called "refVal" which is then used as the basis for refinement (see primalRefinement/system/preProcess)
 runParallel -s "refVal" $decompDict pimpleFoam -postProcess \
     -dict system/preProcess -latestTime
 
+
+# Run the actual refinement through pimpleFoam (which will use the primalRefinement/constant/dynamicMeshDict file).
+# So do change the limits for lower & upper refinement values for refVal in that file
 runParallel $decompDict pimpleFoam
 
-# copy refined mesh to constant/polyMesh
+# pimpleFoam creates a new time folder 1 that contains the refined mesh.
+# So within each processor folder, we need to copy the refined mesh from the time folder [1] to the constant/polymesh folder
+# Then the header location in the header files needs to be modified
 for file in "${polyMeshFields[@]}"
 do
     ls -d processor* | xargs -I {} \
@@ -104,24 +136,33 @@ do
         ./{}/constant/polyMesh/$file
 done
 
+
 # remove refinementHistory
 ls -d processor* | xargs -I {} \
     rm -Rf ./{}/0/polyMesh/refinementHistory
 
-# remove data from initial run
+
+# remove data from the initial CFD run in primalRun
 rm -Rf ../primal_run/processor*
+
 
 # create processorN/constant/polyMesh directories
 ls -d processor* | xargs -I {} \
     mkdir -p ../primal_run/{}/constant/polyMesh
 
-# copy refined mesh to primal_run
+
+# copy the refined mesh from primal refinement to primal_run.
+# Later on, the snapping process can be executed on that mesh.
 ls -d processor* | xargs -I {} \
                 cp -R ./{}/constant/polyMesh \
                 ../primal_run/{}/constant
 
+
+# Set the path to the primal_run directory
 cd ../primal_run
 
+
+# Change the path location in the header files
 for file in "${polyMeshFields[@]}"
 do
 ls -d processor* | xargs -I {} \
@@ -129,20 +170,33 @@ ls -d processor* | xargs -I {} \
     ./{}/constant/polyMesh/$file
 done
 
+# Run the snapping phase on the refined castellated mesh in the primal_run folder
 runParallel $decompDict -s "AfterRefinement" snappyHexMesh -overwrite
-
 runParallel $decompDict -s "AfterRefinement" topoSet
 
+
+# Restore the 0 folder
 restore0Dir -processor
 
+
+# Initialize the simulation using potentialFoam
 runParallel $decompDict -s "AfterRefinement" potentialFoam -writephi
+
+
+# Check the mesh
 runParallel $decompDict -s "AfterRefinement" checkMesh -writeFields '(nonOrthoAngle)' -constant
 
+
+# Run the second CFD phase (using the refined, snapped mesh)
 runParallel $decompDict -s "AfterRefinement" $(getApplication)
 
+
+# Reconstruct the case
 runApplication reconstructParMesh -constant
 runApplication reconstructPar -latestTime
 
+
+# Create a dummy foam.foam file for processing in Paraview
 touch foam.foam
 
 

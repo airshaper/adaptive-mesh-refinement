@@ -20,16 +20,19 @@ refineInterval  1;
 
 field           refVal;
 
-// adjust the value below (lowerRefineLevel)
-// depending on which refinement strategy is used
+// Change the value for lowerRefineLevel to have less or more cells refined.
+// For the tutorial, 1 was used for curlU and 10 was used for gradP
+
 lowerRefineLevel 1; // or 10 if gradp is used as refinement strategy
 
+// The upper limit has been set to a very high value to have no upper limit
 upperRefineLevel 100000000;
 
 unrefineLevel   0;
 
 nBufferLayers   2;
 
+// Be sure to change this value if you change the refinement levels in snappyHexMesh
 maxRefinement   7;
 
 maxCells        10000000;

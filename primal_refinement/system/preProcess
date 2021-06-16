@@ -27,6 +27,8 @@ functions
         codeEnd
         #{
             Info<< "Started creating refVal field\n" << endl;
+
+            // Create a volume scalar field (refVal will be a scalar, not a vector)
             volScalarField refVal
             (
                 IOobject
@@ -41,19 +43,36 @@ functions
                 dimensionedScalar("refVal", dimensionSet(0, 2, -2, 0, 0, 0, 0), Zero)
             );
 
+            // Create a scalar field that contains the volume of each cell within the mesh
             const scalarField& v = mesh().V();
+
+
 
             // refinement based on normalized pressure gradient
             //const volScalarField& p = mesh().lookupObject<volScalarField>("p");
             //const volScalarField& magGradp = mag(fvc::grad(p));
 
-            // refinement based on normalized velocity curl
+
+
+
+            // refinement based on normalized curl of the velocity field
+
+            // Read the velocity field
             const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+
+            // calculate the curl of the flow and then take the magnitude of it
             const volScalarField& magCurlU = mag(fvc::curl(U));
+
+
+            // For each cell, multiply the refinement value with the third root of the cell volume (which is an estimation of the cell length)
+            // This is to discourage the algorithm to keep refining cells that are already small
 
             forAll(refVal, celli)
             {
+                // For gradient of pressure, use the line below
                 //refVal[celli] = pow(v[celli], 1.0/3.0) * magGradp[celli];
+
+                // For curl of velocity, use the line below
                 refVal[celli] = pow(v[celli], 1.0/3.0) * magCurlU[celli];
             }
 
