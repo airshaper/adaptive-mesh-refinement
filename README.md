@@ -33,6 +33,9 @@ Any field can be used for refinement. In this tutorial, two options have been in
    The refinement is then applied to the castellated mesh of the first loop. Once refinement is done, the castellated mesh is copied to `primal_run` where the snapping phase is executed again to snap the refined mesh to the surface.
    This mesh is then used for the second CFD run.
 
+Flow Chart
+![Flow Chart](images/flow_chart.png?raw=true "Flow Chart")
+
 ## Conclusions
 
 This method allows for mesh refinement of both the volume and the surface mesh.
